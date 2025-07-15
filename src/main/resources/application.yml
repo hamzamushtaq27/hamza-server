@@ -1,0 +1,161 @@
+spring:
+  application:
+    name: hamza
+  
+  profiles:
+    active: dev
+  
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER:}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+    database-platform: org.hibernate.dialect.MySQL8Dialect
+  
+  sql:
+    init:
+      mode: never
+  
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: true
+  
+
+  
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: 86400000 # 24 hours in milliseconds
+  refresh-expiration: 604800000 # 7 days in milliseconds
+
+# External API Configuration
+external-api:
+  openai:
+    api-key: ${OPENAI_API_KEY}
+    model: gpt-3.5-turbo
+    max-tokens: 150
+    temperature: 0.7
+  
+  google:
+    api-key: ${GOOGLE_MAPS_API_KEY}
+    places-url: https://maps.googleapis.com/maps/api/place/nearbysearch/json
+    geocoding-url: https://maps.googleapis.com/maps/api/geocode/json
+
+# Application Configuration
+app:
+  base-url: http://localhost:8080
+  cors:
+    allowed-origins: 
+      - http://localhost:3000
+      - http://localhost:3001
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+    allowed-headers: "*"
+    max-age: 3600
+  
+  diagnosis:
+    phq9:
+      normal: 4
+      mild: 9
+      moderate: 14
+      severe: 19
+    retest-interval: 7 # days
+  
+  treatment:
+    session-duration: 600 # seconds (10 minutes)
+    max-sessions-per-day: 5
+  
+  hospital:
+    search-radius: 10 # km
+    max-results: 20
+  
+  chatbot:
+    crisis-keywords:
+      - "자살"
+      - "죽고싶어"
+      - "포기"
+      - "절망"
+      - "죽음"
+    emergency-contact: "1588-9191"
+
+# Logging Configuration
+logging:
+  level:
+    com.dgsw.hamza: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: INFO
+    org.hibernate: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/restart-clinic.log
+    max-size: 10MB
+    max-history: 30
+
+# Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  health:
+    defaults:
+      enabled: true
+
+# Server Configuration
+server:
+  address: 0.0.0.0
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: on_param
+    include-exception: false
+  
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+# SpringDoc OpenAPI Configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tryItOutEnabled: true
+    operationsSorter: method
+    tagsSorter: alpha
+    filter: true
+  show-actuator: true
+  group-configs:
+    - group: "hamza-api"
+      paths-to-match: "/api/**"
+      packages-to-scan: com.dgsw.hamza.controller
