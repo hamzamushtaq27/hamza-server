@@ -40,9 +40,9 @@ public class ChatService {
     @PostConstruct
     private void initWebClient() {
         this.webClient = WebClient.builder()
-            .baseUrl("https://api.openai.com/v1")
-            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + openaiApiKey)
-            .build();
+                .baseUrl("https://api.openai.com/v1")
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + openaiApiKey)
+                .build();
     }
 
     private String generateAIResponse(String userMessage) {
@@ -55,19 +55,19 @@ public class ChatService {
         requestBody.put("temperature", 0.5);
 
         Mono<String> responseMono = webClient.post()
-            .uri("/chat/completions")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(requestBody.toString())
-            .retrieve()
-            .bodyToMono(String.class);
+                .uri("/chat/completions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(requestBody.toString())
+                .retrieve()
+                .bodyToMono(String.class);
 
         String response = responseMono.block(); // 동기적으로 결과 받기(그래도 RestTemplate보다 빠름)
         JSONObject responseBody = new JSONObject(response);
         String aiReply = responseBody
-            .getJSONArray("choices")
-            .getJSONObject(0)
-            .getJSONObject("message")
-            .getString("content");
+                .getJSONArray("choices")
+                .getJSONObject(0)
+                .getJSONObject("message")
+                .getString("content");
 
         return aiReply.trim();
     }
@@ -185,17 +185,17 @@ public class ChatService {
         log.info("사용자 {} 활성 세션 조회", user.getId());
         List<ChatSession> sessions = sessionRepository.findActiveSessionsByUser(user);
         List<ChatDto.ChatSessionInfo> list = sessions.stream().map(s -> {
-            ChatDto.ChatSessionInfo build = ChatDto.ChatSessionInfo.builder()
-                    .sessionId(s.getId())
-                    .userId(user.getId())
-                    .startTime(s.getCreatedAt())
-                    .lastActivity(s.getEndedAt() != null ? s.getEndedAt() : s.getCreatedAt())
-                    .messageCount(Math.toIntExact(messageRepository.countByChatSession(s)))
-                    .crisisDetectionCount((int) messageRepository.findByChatSessionOrderByCreatedAt(s).stream().filter(m -> m.getCrisisLevel() != null && m.getCrisisLevel() != CrisisLevel.NONE).count())
-                    .isActive(s.getIsActive())
-                    .sessionSummary("")
-                    .build();
-            return build;
+                    ChatDto.ChatSessionInfo build = ChatDto.ChatSessionInfo.builder()
+                            .sessionId(s.getId())
+                            .userId(user.getId())
+                            .startTime(s.getCreatedAt())
+                            .lastActivity(s.getEndedAt() != null ? s.getEndedAt() : s.getCreatedAt())
+                            .messageCount(Math.toIntExact(messageRepository.countByChatSession(s)))
+                            .crisisDetectionCount((int) messageRepository.findByChatSessionOrderByCreatedAt(s).stream().filter(m -> m.getCrisisLevel() != null && m.getCrisisLevel() != CrisisLevel.NONE).count())
+                            .isActive(s.getIsActive())
+                            .sessionSummary("")
+                            .build();
+                    return build;
                 }
         ).toList();
         return list;

@@ -25,6 +25,7 @@ public class SwaggerConfig {
         return new OpenAPI()
                 .info(apiInfo())
                 .servers(List.of(
+                        new Server().url("https://be0ee3a02f69.ngrok-free.app").description("Ngrok server (Primary)"),
                         new Server().url("http://localhost:" + serverPort).description("Development server"),
                         new Server().url("https://hamza-api.com").description("Production server")
                 ))

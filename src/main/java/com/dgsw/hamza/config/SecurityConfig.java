@@ -18,6 +18,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
@@ -46,15 +49,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            // CORS 설정
-            .cors(cors -> cors.configurationSource(request -> {
-                var corsConfig = new org.springframework.web.cors.CorsConfiguration();
-                corsConfig.setAllowedOriginPatterns(java.util.List.of("*"));
-                corsConfig.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-                corsConfig.setAllowedHeaders(java.util.List.of("*"));
-                corsConfig.setAllowCredentials(true);
-                return corsConfig;
-            }))
+            // CORS 설정 - 단순화된 설정
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             
             // CSRF 비활성화 (JWT 사용으로 불필요)
             .csrf(AbstractHttpConfigurer::disable)
@@ -85,11 +81,15 @@ public class SecurityConfig {
             .authorizeHttpRequests(authz -> authz
                 // 인증 없이 접근 가능한 경로
                 .requestMatchers(
-                    "/api/auth/signin", "/api/auth/signup", "/api/auth/refresh",
-                    "/api/auth/signIn", "/api/auth/signUp"
+                        "/favicon.ico",
+                    "/api/auth/signin", "/api/auth/signup", "/api/auth/refresh"
                 ).permitAll()
                 .requestMatchers("/api/auth/check-email", "/api/auth/check-nickname").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
+                
+                // 개발 환경에서 모든 API 접근 허용 (CORS 테스트용)
+                .requestMatchers("/api/diagnosis/questions").permitAll()
+                .requestMatchers("/api/**").permitAll()
                 
                 // Swagger UI 접근 허용
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
@@ -121,5 +121,21 @@ public class SecurityConfig {
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        
+        configuration.addAllowedOriginPattern("*");
+        configuration.addAllowedMethod("*");
+        configuration.addAllowedHeader("*");
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        
+        return source;
     }
 }
