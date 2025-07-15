@@ -27,12 +27,6 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, Long> 
     Optional<ChatSession> findLatestSessionByUser(@Param("user") User user);
 
     /**
-     * 세션 ID로 활성 세션 조회
-     */
-    @Query("SELECT cs FROM ChatSession cs WHERE cs.sessionId = :sessionId AND cs.isActive = true")
-    Optional<ChatSession> findActiveSessionBySessionId(@Param("sessionId") String sessionId);
-
-    /**
      * 사용자의 세션 히스토리 조회
      */
     @Query("SELECT cs FROM ChatSession cs WHERE cs.user = :user ORDER BY cs.createdAt DESC")
@@ -128,13 +122,6 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, Long> 
     Boolean hasActiveSession(@Param("user") User user);
 
     /**
-     * 세션 ID 중복 확인
-     */
-    @Query("SELECT CASE WHEN COUNT(cs) > 0 THEN true ELSE false END FROM ChatSession cs " +
-           "WHERE cs.sessionId = :sessionId")
-    Boolean existsBySessionId(@Param("sessionId") String sessionId);
-
-    /**
      * 사용자의 마지막 활동 시간 조회
      */
     @Query("SELECT MAX(cs.endedAt) FROM ChatSession cs WHERE cs.user = :user")
@@ -171,12 +158,6 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, Long> 
            "FROM ChatSession cs WHERE cs.createdAt >= :startDate " +
            "GROUP BY DAYOFWEEK(cs.createdAt) ORDER BY dayOfWeek")
     List<Object[]> findWeeklySessionPattern(@Param("startDate") LocalDateTime startDate);
-
-    /**
-     * 세션 ID로 세션 조회 (활성/비활성 무관)
-     */
-    @Query("SELECT cs FROM ChatSession cs WHERE cs.sessionId = :sessionId")
-    Optional<ChatSession> findBySessionId(@Param("sessionId") String sessionId);
 
     /**
      * 사용자의 최근 N개 세션 조회

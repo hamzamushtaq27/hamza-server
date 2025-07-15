@@ -26,4 +26,13 @@ public enum CrisisLevel {
     public boolean isHighRisk() {
         return level >= 3;
     }
+
+    public static CrisisLevel fromLevel(int level) {
+        for (CrisisLevel cl : CrisisLevel.values()) {
+            if (cl.getLevel() == level) {
+                return cl;
+            }
+        }
+        return NONE;
+    }
 }

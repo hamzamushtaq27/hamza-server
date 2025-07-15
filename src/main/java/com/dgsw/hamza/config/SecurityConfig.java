@@ -84,7 +84,10 @@ public class SecurityConfig {
             // URL 별 권한 설정
             .authorizeHttpRequests(authz -> authz
                 // 인증 없이 접근 가능한 경로
-                .requestMatchers("/api/auth/signin", "/api/auth/signup", "/api/auth/refresh").permitAll()
+                .requestMatchers(
+                    "/api/auth/signin", "/api/auth/signup", "/api/auth/refresh",
+                    "/api/auth/signIn", "/api/auth/signUp"
+                ).permitAll()
                 .requestMatchers("/api/auth/check-email", "/api/auth/check-nickname").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
                 

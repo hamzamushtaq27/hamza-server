@@ -112,7 +112,7 @@ public class ChatController {
     @PostMapping("/sessions/{sessionId}/end")
     public ResponseEntity<Void> endSession(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @Parameter(description = "세션 ID") @PathVariable String sessionId) {
+            @Parameter(description = "세션 ID") @PathVariable Long sessionId) {
 
         log.info("사용자 {} 세션 {} 종료", userPrincipal.getId(), sessionId);
 

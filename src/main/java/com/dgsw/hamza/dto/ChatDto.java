@@ -28,8 +28,8 @@ public class ChatDto {
         @Schema(description = "메시지 내용", example = "안녕하세요, 요즘 기분이 좋지 않아요")
         private String message;
         
-        @Schema(description = "세션 ID", example = "session_123")
-        private String sessionId;
+        @Schema(description = "세션 ID", example = "123")
+        private Long sessionId;
         
         @Schema(description = "긴급 상황 여부", example = "false")
         private Boolean isEmergency;
@@ -45,8 +45,8 @@ public class ChatDto {
         @Schema(description = "메시지 ID", example = "1")
         private Long messageId;
         
-        @Schema(description = "세션 ID", example = "session_123")
-        private String sessionId;
+        @Schema(description = "세션 ID", example = "123")
+        private Long sessionId;
         
         @Schema(description = "봇 응답 메시지", example = "안녕하세요! 오늘 기분이 어떠신가요?")
         private String response;
@@ -83,9 +83,6 @@ public class ChatDto {
     @Schema(description = "채팅 세션 정보")
     public static class ChatSessionInfo {
         
-        @Schema(description = "세션 ID", example = "session_123")
-        private String sessionId;
-        
         @Schema(description = "사용자 ID", example = "1")
         private Long userId;
         
@@ -106,6 +103,9 @@ public class ChatDto {
         
         @Schema(description = "세션 요약", example = "사용자와 일반적인 대화를 나눴습니다")
         private String sessionSummary;
+        
+        @Schema(description = "세션 ID", example = "123")
+        private Long sessionId;
     }
 
     @Data
@@ -115,8 +115,8 @@ public class ChatDto {
     @Schema(description = "채팅 히스토리 조회 요청")
     public static class ChatHistoryRequest {
         
-        @Schema(description = "세션 ID", example = "session_123")
-        private String sessionId;
+        @Schema(description = "세션 ID", example = "123")
+        private Long sessionId;
         
         @Schema(description = "조회할 메시지 수", example = "50")
         private Integer limit;
@@ -296,8 +296,8 @@ public class ChatDto {
     @Schema(description = "대화 컨텍스트 정보")
     public static class ConversationContext {
         
-        @Schema(description = "세션 ID")
-        private String sessionId;
+        @Schema(description = "세션 ID", example = "123")
+        private Long sessionId;
         
         @Schema(description = "이전 메시지들")
         private List<String> previousMessages;

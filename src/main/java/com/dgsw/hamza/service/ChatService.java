@@ -8,13 +8,20 @@ import com.dgsw.hamza.enums.ChatMessageType;
 import com.dgsw.hamza.enums.CrisisLevel;
 import com.dgsw.hamza.repository.ChatMessageRepository;
 import com.dgsw.hamza.repository.ChatSessionRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +32,46 @@ public class ChatService {
     private final ChatSessionRepository sessionRepository;
     private final ChatMessageRepository messageRepository;
 
+    @Value("${openai.api-key}")
+    private String openaiApiKey;
+
+    private WebClient webClient;
+
+    @PostConstruct
+    private void initWebClient() {
+        this.webClient = WebClient.builder()
+            .baseUrl("https://api.openai.com/v1")
+            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + openaiApiKey)
+            .build();
+    }
+
+    private String generateAIResponse(String userMessage) {
+        JSONObject requestBody = new JSONObject();
+        requestBody.put("model", "gpt-3.5-turbo-0125");
+        JSONArray messages = new JSONArray();
+        messages.put(new JSONObject().put("role", "user").put("content", userMessage));
+        requestBody.put("messages", messages);
+        requestBody.put("max_tokens", 64);
+        requestBody.put("temperature", 0.5);
+
+        Mono<String> responseMono = webClient.post()
+            .uri("/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(requestBody.toString())
+            .retrieve()
+            .bodyToMono(String.class);
+
+        String response = responseMono.block(); // 동기적으로 결과 받기(그래도 RestTemplate보다 빠름)
+        JSONObject responseBody = new JSONObject(response);
+        String aiReply = responseBody
+            .getJSONArray("choices")
+            .getJSONObject(0)
+            .getJSONObject("message")
+            .getString("content");
+
+        return aiReply.trim();
+    }
+
     /**
      * 간단한 채팅 메시지 처리
      */
@@ -33,6 +80,9 @@ public class ChatService {
 
         // 1. 세션 조회 또는 생성
         ChatSession session = getOrCreateSession(user, request.getSessionId());
+        if (session == null) {
+            throw new IllegalStateException("채팅 세션을 생성할 수 없습니다.");
+        }
 
         // 2. 사용자 메시지 저장
         ChatMessage userMessage = ChatMessage.builder()
@@ -42,8 +92,8 @@ public class ChatService {
                 .build();
         messageRepository.save(userMessage);
 
-        // 3. 간단한 봇 응답 생성
-        String botResponse = generateSimpleResponse(request.getMessage());
+        // 3. AI 챗봇 응답 생성
+        String botResponse = generateAIResponse(request.getMessage());
 
         // 4. 봇 메시지 저장
         ChatMessage botMessage = ChatMessage.builder()
@@ -56,7 +106,7 @@ public class ChatService {
         // 5. 응답 생성
         return ChatDto.ChatMessageResponse.builder()
                 .messageId(botMessage.getId())
-                .sessionId(session.getId().toString())
+                .sessionId(session.getId())
                 .response(botResponse)
                 .messageType(ChatMessageType.BOT)
                 .crisisLevel(CrisisLevel.NONE)
@@ -72,10 +122,58 @@ public class ChatService {
     public ChatDto.ChatHistoryResponse getChatHistory(User user, ChatDto.ChatHistoryRequest request) {
         log.info("사용자 {} 채팅 히스토리 조회", user.getId());
 
-        // 간단한 히스토리 응답
+        ChatSession session = null;
+        if (request.getSessionId() != null) {
+            try {
+                Long sessionId = request.getSessionId();
+                session = sessionRepository.findById(sessionId).orElse(null);
+            } catch (NumberFormatException e) {
+                // 잘못된 세션 ID
+            }
+        }
+        if (session == null) {
+            return ChatDto.ChatHistoryResponse.builder()
+                    .messages(List.of())
+                    .totalCount(0)
+                    .build();
+        }
+        // 메시지 조회 (필터/페이징/기간 등은 간단화)
+        List<ChatMessage> messages = messageRepository.findByChatSessionOrderByCreatedAt(session);
+        List<ChatDto.ChatMessageHistory> messageDtos = messages.stream().map(m ->
+                ChatDto.ChatMessageHistory.builder()
+                        .messageId(m.getId())
+                        .content(m.getMessageContent())
+                        .messageType(m.isFromUser() ? ChatMessageType.USER : ChatMessageType.BOT)
+                        .crisisLevel(m.getCrisisLevel() != null ? m.getCrisisLevel() : CrisisLevel.NONE)
+                        .timestamp(m.getCreatedAt())
+                        .emotionAnalysis(null) // 감정 분석 결과 추가 가능
+                        .build()
+        ).toList();
+        int totalCount = messages.size();
+        // 세션 정보
+        ChatDto.ChatSessionInfo sessionInfo = ChatDto.ChatSessionInfo.builder()
+                .sessionId(session.getId())
+                .userId(user.getId())
+                .startTime(session.getCreatedAt())
+                .lastActivity(session.getEndedAt() != null ? session.getEndedAt() : session.getCreatedAt())
+                .messageCount(totalCount)
+                .crisisDetectionCount((int) messages.stream().filter(m -> m.getCrisisLevel() != null && m.getCrisisLevel() != CrisisLevel.NONE).count())
+                .isActive(session.getIsActive())
+                .sessionSummary("")
+                .build();
+        // 위기 통계 (간단화)
+        ChatDto.CrisisStatistics crisisStats = ChatDto.CrisisStatistics.builder()
+                .totalMessages(totalCount)
+                .crisisMessages((int) messages.stream().filter(m -> m.getCrisisLevel() != null && m.getCrisisLevel() != CrisisLevel.NONE).count())
+                .highestCrisisLevel(messages.stream().map(ChatMessage::getCrisisLevel).filter(l -> l != null).max(Enum::compareTo).orElse(CrisisLevel.NONE))
+                .crisisRate(totalCount == 0 ? 0.0 : 100.0 * messages.stream().filter(m -> m.getCrisisLevel() != null && m.getCrisisLevel() != CrisisLevel.NONE).count() / (double) totalCount)
+                .crisisDistribution(List.of()) // 분포 추가 가능
+                .build();
         return ChatDto.ChatHistoryResponse.builder()
-                .messages(List.of())
-                .totalCount(0)
+                .messages(messageDtos)
+                .totalCount(totalCount)
+                .sessionInfo(sessionInfo)
+                .crisisStats(crisisStats)
                 .build();
     }
 
@@ -85,23 +183,49 @@ public class ChatService {
     @Transactional(readOnly = true)
     public List<ChatDto.ChatSessionInfo> getActiveSessions(User user) {
         log.info("사용자 {} 활성 세션 조회", user.getId());
-        return List.of();
+        List<ChatSession> sessions = sessionRepository.findActiveSessionsByUser(user);
+        List<ChatDto.ChatSessionInfo> list = sessions.stream().map(s -> {
+            ChatDto.ChatSessionInfo build = ChatDto.ChatSessionInfo.builder()
+                    .sessionId(s.getId())
+                    .userId(user.getId())
+                    .startTime(s.getCreatedAt())
+                    .lastActivity(s.getEndedAt() != null ? s.getEndedAt() : s.getCreatedAt())
+                    .messageCount(Math.toIntExact(messageRepository.countByChatSession(s)))
+                    .crisisDetectionCount((int) messageRepository.findByChatSessionOrderByCreatedAt(s).stream().filter(m -> m.getCrisisLevel() != null && m.getCrisisLevel() != CrisisLevel.NONE).count())
+                    .isActive(s.getIsActive())
+                    .sessionSummary("")
+                    .build();
+            return build;
+                }
+        ).toList();
+        return list;
     }
 
     /**
      * 세션 종료
      */
-    public void endSession(User user, String sessionId) {
+    public void endSession(User user, Long sessionId) {
         log.info("사용자 {} 세션 {} 종료", user.getId(), sessionId);
-        // 간단한 구현
+        if (sessionId == null) return;
+        sessionRepository.findById(sessionId).ifPresent(session -> {
+            if (session.getUser().getId().equals(user.getId()) && session.getIsActive()) {
+                session.setIsActive(false);
+                session.setEndedAt(LocalDateTime.now());
+                sessionRepository.save(session);
+            }
+        });
     }
 
     /**
      * 위기 상황 감지 알림
      */
-    public void handleCrisisAlert(User user, String sessionId, CrisisLevel crisisLevel) {
+    public void handleCrisisAlert(User user, Long sessionId, CrisisLevel crisisLevel) {
         log.warn("사용자 {} 위기 상황 감지 - 수준: {}", user.getId(), crisisLevel);
-        // 간단한 구현
+        if (sessionId == null) return;
+        sessionRepository.findById(sessionId).ifPresent(session -> {
+            session.setCrisisLevelEnum(crisisLevel);
+            sessionRepository.save(session);
+        });
     }
 
     /**
@@ -110,12 +234,15 @@ public class ChatService {
     @Transactional(readOnly = true)
     public ChatDto.ChatbotStatus getChatbotStatus() {
         log.info("챗봇 상태 조회");
-
+        int activeSessionCount = sessionRepository.countActiveSessions().intValue();
+        int todayMessageCount = messageRepository.countTodayMessages().intValue();
+        int crisisDetectionCount = messageRepository.findCrisisMessages().size();
+        // 평균 응답 시간은 샘플로 150L 유지
         return ChatDto.ChatbotStatus.builder()
                 .isActive(true)
-                .activeSessionCount(0)
-                .todayMessageCount(0)
-                .crisisDetectionCount(0)
+                .activeSessionCount(activeSessionCount)
+                .todayMessageCount(todayMessageCount)
+                .crisisDetectionCount(crisisDetectionCount)
                 .averageResponseTime(150L)
                 .lastUpdateTime(LocalDateTime.now())
                 .build();
@@ -127,46 +254,29 @@ public class ChatService {
     @Transactional(readOnly = true)
     public Object generateEmotionReport(User user, int days) {
         log.info("사용자 {} 감정 분석 보고서 생성 - {}일", user.getId(), days);
-
+        LocalDateTime since = LocalDateTime.now().minusDays(days);
+        var trend = messageRepository.findEmotionScoreTrend(user, since);
+        Double avg = messageRepository.findAverageEmotionScoreByUser(user);
+        Object stats = messageRepository.findEmotionStatsByUser(user);
         return new Object() {
-            public final String message = "감정 분석 보고서 (간단 버전)";
+            public final String message = "감정 분석 보고서";
             public final LocalDateTime generatedAt = LocalDateTime.now();
+            public final Object emotionTrend = trend;
+            public final Double averageScore = avg;
+            public final Object emotionStats = stats;
         };
     }
 
     // Private helper methods
 
-    private ChatSession getOrCreateSession(User user, String sessionId) {
+    private ChatSession getOrCreateSession(User user, Long sessionId) {
         if (sessionId != null) {
-            try {
-                Long id = Long.parseLong(sessionId);
-                return sessionRepository.findById(id).orElse(null);
-            } catch (NumberFormatException e) {
-                // 잘못된 세션 ID 형식
-            }
+            ChatSession found = sessionRepository.findById(sessionId).orElse(null);
+            if (found != null) return found;
         }
-
-        // 새 세션 생성
         ChatSession session = ChatSession.builder()
                 .user(user)
                 .build();
-
         return sessionRepository.save(session);
-    }
-
-    private String generateSimpleResponse(String userMessage) {
-        String message = userMessage.toLowerCase();
-        
-        if (message.contains("안녕") || message.contains("hello")) {
-            return "안녕하세요! 오늘 기분은 어떠신가요?";
-        } else if (message.contains("우울") || message.contains("슬퍼")) {
-            return "우울한 기분이시군요. 이런 감정을 느끼는 것은 자연스러운 일입니다.";
-        } else if (message.contains("불안") || message.contains("걱정")) {
-            return "불안한 마음이 드시는군요. 깊게 숨을 들이마시고 천천히 내쉬어보세요.";
-        } else if (message.contains("고마워") || message.contains("감사")) {
-            return "천만에요! 언제든 도움이 필요하시면 말씀해 주세요.";
-        } else {
-            return "말씀해 주신 내용을 잘 들었습니다. 더 자세히 이야기해 주실 수 있나요?";
-        }
     }
 }

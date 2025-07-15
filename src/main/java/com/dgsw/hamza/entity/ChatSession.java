@@ -1,5 +1,6 @@
 package com.dgsw.hamza.entity;
 
+import com.dgsw.hamza.enums.CrisisLevel;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,15 +21,16 @@ import java.util.List;
 @Builder
 public class ChatSession extends BaseEntity {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @Column(name = "session_name")
     private String sessionName;
-
-    @Column(name = "session_id", nullable = false, unique = true)
-    private String sessionId;
 
     @Column(name = "started_at")
     private LocalDateTime startedAt;
@@ -44,8 +46,9 @@ public class ChatSession extends BaseEntity {
     @Builder.Default
     private Boolean crisisDetected = false;
 
-    @Column(name = "crisis_level")
-    private Integer crisisLevel; // 1-10 scale
+    @Enumerated(EnumType.STRING)
+    @Column(name = "crisis_level_enum")
+    private CrisisLevel crisisLevelEnum;
 
     @Column(name = "total_messages")
     @Builder.Default
@@ -78,7 +81,7 @@ public class ChatSession extends BaseEntity {
 
     public void detectCrisis(int level) {
         this.crisisDetected = true;
-        this.crisisLevel = level;
+        this.crisisLevelEnum = CrisisLevel.fromLevel(level);
     }
 
     public void addMessage(ChatMessage message) {
@@ -101,7 +104,7 @@ public class ChatSession extends BaseEntity {
     }
 
     public boolean hasHighCrisisLevel() {
-        return crisisLevel != null && crisisLevel >= 8;
+        return crisisLevelEnum != null && crisisLevelEnum.getLevel() >= 8;
     }
 
     public boolean hasPositiveSentiment() {

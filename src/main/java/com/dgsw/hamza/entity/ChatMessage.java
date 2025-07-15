@@ -1,5 +1,6 @@
 package com.dgsw.hamza.entity;
 
+import com.dgsw.hamza.enums.CrisisLevel;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -52,6 +53,10 @@ public class ChatMessage extends BaseEntity {
     @Column(name = "is_crisis_related")
     @Builder.Default
     private Boolean isCrisisRelated = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "crisis_level")
+    private CrisisLevel crisisLevel;
 
     @Column(name = "ai_response_confidence")
     private Double aiResponseConfidence;
