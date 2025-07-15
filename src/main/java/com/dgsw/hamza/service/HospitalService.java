@@ -1,11 +1,13 @@
 package com.dgsw.hamza.service;
 
+import com.dgsw.hamza.config.CacheConfig;
 import com.dgsw.hamza.dto.HospitalDto;
 import com.dgsw.hamza.entity.Hospital;
 import com.dgsw.hamza.repository.HospitalRepository;
 import com.dgsw.hamza.util.LocationCalculator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;

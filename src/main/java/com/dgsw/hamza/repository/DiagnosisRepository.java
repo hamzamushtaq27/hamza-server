@@ -164,4 +164,14 @@ public interface DiagnosisRepository extends JpaRepository<Diagnosis, Long> {
     List<Object[]> findDiagnosisPattern(@Param("user") User user);
 
     List<Diagnosis> findByUser(User user);
+    
+    /**
+     * 사용자의 진단 히스토리 (페이징) - createdAt 기준
+     */
+    Page<Diagnosis> findByUserOrderByCreatedAtDesc(User user, Pageable pageable);
+    
+    /**
+     * 최근 10개 진단 조회 (통계용)
+     */
+    List<Diagnosis> findTop10ByUserOrderByCreatedAtDesc(User user);
 }

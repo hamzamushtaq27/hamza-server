@@ -1,6 +1,9 @@
 package com.dgsw.hamza.service;
 
+import com.dgsw.hamza.config.CacheConfig;
 import com.dgsw.hamza.dto.DiagnosisDto;
+import com.dgsw.hamza.dto.PageRequest;
+import com.dgsw.hamza.dto.PageResponse;
 import com.dgsw.hamza.entity.Diagnosis;
 import com.dgsw.hamza.entity.User;
 import com.dgsw.hamza.enums.DiagnosisSeverity;
@@ -8,6 +11,8 @@ import com.dgsw.hamza.repository.DiagnosisRepository;
 import com.dgsw.hamza.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +33,7 @@ public class DiagnosisService {
      * PHQ-9 설문 문항 조회 (하드코딩)
      */
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.DIAGNOSIS_QUESTIONS_CACHE, key = "'phq9_questions'")
     public List<DiagnosisDto.QuestionResponse> getQuestions() {
         log.info("PHQ-9 설문 문항 조회");
         
@@ -168,6 +174,25 @@ public class DiagnosisService {
                 .mostFrequentSeverity(DiagnosisSeverity.NORMAL)
                 .severityDistribution(List.of())
                 .build();
+    }
+
+    /**
+     * 진단 히스토리 페이지네이션 조회
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<DiagnosisDto.DiagnosisHistoryItem> getDiagnosisHistoryPaged(User user, PageRequest pageRequest) {
+        log.info("사용자 {} 진단 히스토리 페이지네이션 조회", user.getId());
+
+        Page<Diagnosis> diagnosisPage = diagnosisRepository.findByUserOrderByCreatedAtDesc(
+                user, pageRequest.toPageable());
+
+        return PageResponse.of(diagnosisPage.map(diagnosis -> 
+                DiagnosisDto.DiagnosisHistoryItem.builder()
+                        .diagnosisId(diagnosis.getId())
+                        .totalScore(diagnosis.getTotalScore())
+                        .severity(diagnosis.getSeverity())
+                        .diagnosisDate(diagnosis.getCreatedAt())
+                        .build()));
     }
 
     // Private helper methods

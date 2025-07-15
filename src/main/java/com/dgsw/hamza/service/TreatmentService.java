@@ -1,5 +1,6 @@
 package com.dgsw.hamza.service;
 
+import com.dgsw.hamza.config.CacheConfig;
 import com.dgsw.hamza.dto.TreatmentDto;
 import com.dgsw.hamza.entity.Treatment;
 import com.dgsw.hamza.entity.TreatmentContent;
@@ -7,6 +8,7 @@ import com.dgsw.hamza.enums.TreatmentType;
 import com.dgsw.hamza.repository.TreatmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,6 +31,7 @@ public class TreatmentService {
      * 활성화된 모든 치료법 조회
      */
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.TREATMENTS_CACHE, key = "'active_treatments'")
     public List<TreatmentDto.TreatmentInfo> getActiveTreatments() {
         log.info("활성화된 치료법 목록 조회");
         

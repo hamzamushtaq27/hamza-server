@@ -1,6 +1,8 @@
 package com.dgsw.hamza.controller;
 
 import com.dgsw.hamza.dto.DiagnosisDto;
+import com.dgsw.hamza.dto.PageRequest;
+import com.dgsw.hamza.dto.PageResponse;
 import com.dgsw.hamza.entity.User;
 import com.dgsw.hamza.security.UserPrincipal;
 import com.dgsw.hamza.repository.UserRepository;
@@ -66,22 +68,28 @@ public class DiagnosisController {
     }
 
 
-    @Operation(summary = "진단 히스토리 조회", description = "사용자의 과거 진단 기록을 조회합니다")
+    @Operation(summary = "진단 히스토리 조회", description = "사용자의 과거 진단 기록을 페이지네이션으로 조회합니다")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "히스토리 조회 성공"),
             @ApiResponse(responseCode = "401", description = "인증 필요"),
             @ApiResponse(responseCode = "500", description = "서버 오류")
     })
     @GetMapping("/history")
-    public ResponseEntity<DiagnosisDto.DiagnosisHistoryResponse> getDiagnosisHistory(
+    public ResponseEntity<PageResponse<DiagnosisDto.DiagnosisHistoryItem>> getDiagnosisHistory(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @Parameter(description = "조회할 진단 개수") @RequestParam(defaultValue = "10") Integer limit) {
+            @Parameter(description = "페이지 번호") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "페이지 크기") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "정렬 기준") @RequestParam(defaultValue = "createdAt") String sort,
+            @Parameter(description = "정렬 방향") @RequestParam(defaultValue = "desc") String direction) {
         
-        log.info("사용자 {} 진단 히스토리 조회 (limit: {})", userPrincipal.getId(), limit);
+        log.info("사용자 {} 진단 히스토리 조회 (page: {}, size: {})", userPrincipal.getId(), page, size);
         
         User user = userRepository.findById(userPrincipal.getId())
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
-        DiagnosisDto.DiagnosisHistoryResponse response = diagnosisService.getDiagnosisHistory(user, limit);
+        
+        PageRequest pageRequest = new PageRequest(page, size, sort, direction);
+        PageResponse<DiagnosisDto.DiagnosisHistoryItem> response = 
+            diagnosisService.getDiagnosisHistoryPaged(user, pageRequest);
         
         return ResponseEntity.ok(response);
     }

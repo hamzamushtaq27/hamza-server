@@ -1,6 +1,7 @@
 package com.dgsw.hamza.exception;
 
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.validation.ConstraintViolationException;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -153,6 +155,78 @@ public class GlobalExceptionHandler {
                 .build();
         
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolationException(
+            ConstraintViolationException ex, WebRequest request) {
+        
+        log.error("ConstraintViolationException: {}", ex.getMessage());
+        
+        List<FieldErrorDetail> fieldErrors = ex.getConstraintViolations()
+                .stream()
+                .map(violation -> FieldErrorDetail.builder()
+                        .field(violation.getPropertyPath().toString())
+                        .rejectedValue(violation.getInvalidValue())
+                        .message(violation.getMessage())
+                        .build())
+                .collect(Collectors.toList());
+        
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Validation Failed")
+                .message("입력 값이 유효하지 않습니다.")
+                .path(request.getDescription(false).replace("uri=", ""))
+                .fieldErrors(fieldErrors)
+                .build();
+        
+        return ResponseEntity.badRequest().body(errorResponse);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException ex, WebRequest request) {
+        
+        log.error("MethodArgumentTypeMismatchException: {}", ex.getMessage());
+        
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Type Mismatch")
+                .message(String.format("파라미터 '%s'의 타입이 올바르지 않습니다.", ex.getName()))
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+        
+        return ResponseEntity.badRequest().body(errorResponse);
+    }
+
+    @ExceptionHandler(ValidationException.class)
+    public ResponseEntity<ErrorResponse> handleCustomValidationException(
+            ValidationException ex, WebRequest request) {
+        
+        log.error("ValidationException: {}", ex.getMessage());
+        
+        List<FieldErrorDetail> fieldErrors = ex.getValidationErrors()
+                .entrySet()
+                .stream()
+                .flatMap(entry -> entry.getValue().stream()
+                        .map(message -> FieldErrorDetail.builder()
+                                .field(entry.getKey())
+                                .message(message)
+                                .build()))
+                .collect(Collectors.toList());
+        
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Validation Failed")
+                .message(ex.getMessage())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .fieldErrors(fieldErrors)
+                .build();
+        
+        return ResponseEntity.badRequest().body(errorResponse);
     }
 
     @ExceptionHandler(Exception.class)
